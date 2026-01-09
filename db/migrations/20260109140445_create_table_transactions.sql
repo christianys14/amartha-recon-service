@@ -13,6 +13,6 @@ create table transactions
 
 create index idx_transaction_id_rrn on transactions (transaction_id, terminal_rrn);
 create index idx_timestamp on transactions (transaction_time, updated_at);
-
+create index idx_bank_code on transactions (bank_code);
 -- migrate:down
 drop transactions;
