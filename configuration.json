@@ -1,0 +1,6 @@
+{
+  "custom.dummy.customers" : "3",
+  "app.recon.version" : "1.0.1",
+  "server.address.http" : ":5051",
+  "custom.weeks" : "50"
+}
