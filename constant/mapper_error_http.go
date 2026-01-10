@@ -13,6 +13,7 @@ const (
 	GeneralError
 	PaymentAmountShouldBeEquals
 	ZeroOutstanding
+	ValusIsMismatach
 )
 
 var HttpRc = map[BillingSrvHttpError]string{
@@ -21,6 +22,7 @@ var HttpRc = map[BillingSrvHttpError]string{
 	DataNotFound:                "0002",
 	PaymentAmountShouldBeEquals: "0003",
 	ZeroOutstanding:             "0004",
+	ValusIsMismatach:            "0005",
 	GeneralError:                "9999",
 }
 
@@ -30,6 +32,7 @@ var HttpRcDescription = map[BillingSrvHttpError]string{
 	DataNotFound:                "data is not exist",
 	PaymentAmountShouldBeEquals: "amount of payment should be exact",
 	ZeroOutstanding:             "Congrats, you are not having any pending outstanding",
+	ValusIsMismatach:            "Value is mismatched",
 	GeneralError:                "General error",
 }
 
@@ -39,5 +42,6 @@ var BillingCodeToHttpCode = map[string]int{
 	"0002": http.StatusNotFound,
 	"0003": http.StatusBadRequest,
 	"0004": http.StatusOK,
+	"0005": http.StatusBadRequest,
 	"9999": http.StatusInternalServerError,
 }

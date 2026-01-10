@@ -2,9 +2,12 @@ package configuration
 
 import (
 	"context"
-	"database/sql"
 	"log"
 	"time"
+
+	_ "github.com/go-sql-driver/mysql"
+
+	"github.com/jmoiron/sqlx"
 )
 
 type storeImpl struct {
@@ -15,14 +18,14 @@ func NewStoreImpl(credential Configuration) *storeImpl {
 	return &storeImpl{credential: credential}
 }
 
-func (d *storeImpl) initDatabase(configBaseKey string) (*sql.DB, error) {
+func (d *storeImpl) initDatabase(configBaseKey string) (*sqlx.DB, error) {
 	dbHost := d.credential.GetString(configBaseKey + ".host")
 	dbPort := d.credential.GetString(configBaseKey + ".port")
 	dbUser := d.credential.GetString(configBaseKey + ".user")
 	dbPass := d.credential.GetString(configBaseKey + ".pass")
 	dbName := d.credential.GetString(configBaseKey + ".name")
 	sourceName := dbUser + ":" + dbPass + "@tcp(" + dbHost + ":" + dbPort + ")/" + dbName
-	db, err := sql.Open("mysql", sourceName)
+	db, err := sqlx.Open("mysql", sourceName)
 
 	if err != nil {
 		log.Println("error when init database, because ", err)
@@ -40,14 +43,14 @@ func (d *storeImpl) initDatabase(configBaseKey string) (*sql.DB, error) {
 	return db, nil
 }
 
-func (d *storeImpl) InitDBMaster() (*sql.DB, error) {
+func (d *storeImpl) InitDBMaster() (*sqlx.DB, error) {
 	return d.initDatabase("database.master")
 }
 
-func (d *storeImpl) InitDbAuditTrail() (*sql.DB, error) {
+func (d *storeImpl) InitDbAuditTrail() (*sqlx.DB, error) {
 	return d.initDatabase("database.audittrail")
 }
 
-func (d *storeImpl) InitDBReplica() (*sql.DB, error) {
+func (d *storeImpl) InitDBReplica() (*sqlx.DB, error) {
 	return d.initDatabase("database.replica")
 }

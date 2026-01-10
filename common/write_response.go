@@ -38,6 +38,7 @@ func responseWrite(rw http.ResponseWriter, data interface{}, statusCode int) {
 		log.Println("error during encode responseWrite", err)
 	}
 
+	rw.Header().Set(contentType, application)
 	rw.WriteHeader(statusCode)
 	_, err = rw.Write(responseByte)
 }

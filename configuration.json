@@ -1,6 +1,7 @@
 {
-  "custom.dummy.customers" : "3",
   "app.recon.version" : "1.0.1",
   "server.address.http" : ":5051",
-  "custom.weeks" : "50"
+  "custom.weeks" : "50",
+  "max.rows.transactions" : 80000,
+  "max.rows.bank" : 20000
 }

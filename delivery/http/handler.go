@@ -8,24 +8,27 @@ import (
 	"github.com/gorilla/mux"
 )
 
-type billingHandler struct {
+type reconHandler struct {
 	configuration configuration.Configuration
+	controller    Controller
 }
 
-func NewBillingHandler(
-	configuration configuration.Configuration) *billingHandler {
-	return &billingHandler{
+func NewReconHandler(
+	configuration configuration.Configuration,
+	controller Controller) *reconHandler {
+	return &reconHandler{
 		configuration: configuration,
+		controller:    controller,
 	}
 }
 
-func (b *billingHandler) showVersion() {
+func (b *reconHandler) showVersion() {
 	version := b.configuration.GetString("app.recon.version")
 	log.Println("show-recon-version -> ", version)
 }
 
-func (b *billingHandler) BuildHttp(router *mux.Router) http.Handler {
+func (b *reconHandler) BuildHttp(router *mux.Router) http.Handler {
 	b.showVersion()
-	b.routeBilling(router)
+	b.routeRecon(router)
 	return router
 }
