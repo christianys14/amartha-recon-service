@@ -131,7 +131,7 @@ func FindConfiguration(key string) (Configuration, error) {
 		return nil, configurationShouldNotBeEmpty
 	}
 
-	return newConfig(fmt.Sprintf("./%s.json", key))
+	return newConfig(fmt.Sprintf("%s.json", key))
 }
 
 func newConfig(path string) (Configuration, error) {

@@ -33,14 +33,14 @@ func NewService(
 
 func (s service) Proceed(ctx context.Context, file *uploadFile) error {
 	lengthTransaction := len(file.transactionFile)
-	maxRowsTransaction := int(s.cfg.GetInt("max_rows_transaction"))
+	maxRowsTransaction := int(s.cfg.GetInt("max.rows.transactions"))
 
 	if lengthTransaction > maxRowsTransaction {
 		return ErrorMaxRows
 	}
 
 	lengthBank := len(file.bankFile)
-	maxRowsBank := int(s.cfg.GetInt("max_rows_bank"))
+	maxRowsBank := int(s.cfg.GetInt("max.rows.bank"))
 
 	if lengthBank > maxRowsBank {
 		return ErrorMaxRows
@@ -74,7 +74,7 @@ func (s service) Proceed(ctx context.Context, file *uploadFile) error {
 
 	// 3. Create a channel to collect results and use a WaitGroup to manage goroutines
 	maxChunk := int(s.cfg.GetInt("max.chunk"))
-	resultsChan := make(chan []ResultReconciliation)
+	resultsChan := make(chan ResultReconciliation)
 	totalWorkers := 0
 
 	for bankCode := range uniqueBanks {
@@ -129,13 +129,62 @@ func (s service) Proceed(ctx context.Context, file *uploadFile) error {
 	var finalResults []ResultReconciliation
 	for i := 0; i < totalWorkers; i++ {
 		res := <-resultsChan
-		finalResults = append(finalResults, res...)
+		finalResults = append(finalResults, res)
 	}
 
 	return nil
 }
 
-func (s service) reconcile(txs []TransactionUploadFile, banks []BankStatementUploadFile) []ResultReconciliation {
+func (s service) reconcile(txs []TransactionUploadFile, banks []BankStatementUploadFile) ResultReconciliation {
+	result := ResultReconciliation{
+		ResultReconciliationDetails: ResultReconciliationDetails{
+			TransactionMismatched:   []TransactionUploadFile{},
+			BankStatementMismatched: []BankStatementUploadFile{},
+		},
+	}
 
-	return nil
+	// 1. Masukkan data bank ke dalam Map untuk pencarian cepat (O(1))
+	// Gunakan UniqueID atau RRN sebagai key
+	bankMap := make(map[string]BankStatementUploadFile)
+	for _, b := range banks {
+		bankMap[b.UniqueID] = b
+	}
+
+	// 2. Iterasi transaksi sistem dan cari di map bank
+	matchedBankIDs := make(map[string]bool)
+	for _, tx := range txs {
+		bankEntry, found := bankMap[tx.TransactionID]
+
+		if found {
+			matchedBankIDs[tx.TransactionID] = true
+			if tx.Amount.Equal(bankEntry.Amount) {
+				result.TotalNumberOfMatchesTransactions++
+			} else {
+				// Jika ID cocok tapi nominal beda: hitung selisih absolut
+				diff := tx.Amount.Sub(bankEntry.Amount).Abs()
+				result.TotalAmountDiscrepancies = result.TotalAmountDiscrepancies.Add(diff)
+
+				// Masukkan ke mismatched karena nominal tidak sama persis
+				result.TotalNumberOfUnmatchedTransactions++
+				result.ResultReconciliationDetails.TransactionMismatched =
+					append(result.ResultReconciliationDetails.TransactionMismatched, tx)
+			}
+		} else {
+			// Jika ID tidak ditemukan sama sekali di bank
+			result.TotalNumberOfUnmatchedTransactions++
+			result.ResultReconciliationDetails.TransactionMismatched =
+				append(result.ResultReconciliationDetails.TransactionMismatched, tx)
+		}
+	}
+
+	// 3. Cari data bank yang TIDAK ADA di transaksi sistem
+	for _, b := range banks {
+		if !matchedBankIDs[b.UniqueID] {
+			result.ResultReconciliationDetails.BankStatementMismatched =
+				append(result.ResultReconciliationDetails.BankStatementMismatched, b)
+		}
+	}
+
+	result.TotalNumberOfTransactions = len(txs)
+	return result
 }
