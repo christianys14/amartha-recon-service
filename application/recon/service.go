@@ -1,7 +1,6 @@
 package recon
 
 import (
-	"amartha-recon-service/common"
 	"amartha-recon-service/configuration"
 	"amartha-recon-service/infrastructure/repository/transaction"
 	"context"
@@ -16,12 +15,11 @@ var (
 type (
 	service struct {
 		cfg        configuration.Configuration
-		generate   common.Generate
 		repository transaction.Repository
 	}
 
 	Service interface {
-		Proceed(ctx context.Context, file *uploadFile) (ShowResultReconciliation, error)
+		Proceed(ctx context.Context, file *UploadFile) (ShowResultReconciliation, error)
 	}
 )
 
@@ -30,12 +28,11 @@ func NewService(
 	repository transaction.Repository) Service {
 	return &service{
 		cfg:        cfg,
-		generate:   common.NewGenerate(),
 		repository: repository,
 	}
 }
 
-func (s *service) Proceed(ctx context.Context, file *uploadFile) (ShowResultReconciliation, error) {
+func (s *service) Proceed(ctx context.Context, file *UploadFile) (ShowResultReconciliation, error) {
 	lengthTransaction := len(file.transactionFile)
 	maxRowsTransaction := int(s.cfg.GetInt("max.rows.transactions"))
 
@@ -172,14 +169,14 @@ func (s *service) reconcile(
 		},
 	}
 
-	// 1. Masukkan data bank ke dalam Map untuk pencarian cepat (O(1))
-	// Gunakan UniqueID atau RRN sebagai key
+	// 1. Store bank data into a Map for fast lookup (O(1))
+	// Use UniqueID or RRN as the key
 	bankMap := make(map[string]BankStatementUploadFile)
 	for _, b := range banks {
 		bankMap[b.UniqueID] = b
 	}
 
-	// 2. Iterasi transaksi sistem dan cari di map bank
+	// 2. Iterate through system transactions and look them up in the bank map
 	matchedBankIDs := make(map[string]bool)
 	for _, tx := range txs {
 		bankEntry, found := bankMap[tx.TransactionID]
@@ -189,24 +186,24 @@ func (s *service) reconcile(
 			if tx.Amount.Equal(bankEntry.Amount) {
 				result.TotalNumberOfMatchesTransactions++
 			} else {
-				// Jika ID cocok tapi nominal beda: hitung selisih absolut
+				// If ID matches but amount differs: calculate absolute discrepancy
 				diff := tx.Amount.Sub(bankEntry.Amount).Abs()
 				result.TotalAmountDiscrepancies = result.TotalAmountDiscrepancies.Add(diff)
 
-				// Masukkan ke mismatched karena nominal tidak sama persis
+				// Add to mismatched because the amount is not an exact match
 				result.TotalNumberOfUnmatchedTransactions++
 				result.ResultReconciliationDetails.TransactionMismatched =
 					append(result.ResultReconciliationDetails.TransactionMismatched, tx)
 			}
 		} else {
-			// Jika ID tidak ditemukan sama sekali di bank
+			// If ID is not found in the bank data at all
 			result.TotalNumberOfUnmatchedTransactions++
 			result.ResultReconciliationDetails.TransactionMismatched =
 				append(result.ResultReconciliationDetails.TransactionMismatched, tx)
 		}
 	}
 
-	// 3. Cari data bank yang TIDAK ADA di transaksi sistem
+	// 3. Find bank data that DOES NOT EXIST in system transactions
 	for _, b := range banks {
 		if !matchedBankIDs[b.UniqueID] {
 			result.ResultReconciliationDetails.BankStatementMismatched =

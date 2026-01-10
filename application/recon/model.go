@@ -7,7 +7,7 @@ import (
 )
 
 type (
-	uploadFile struct {
+	UploadFile struct {
 		transactionFile []TransactionUploadFile
 		bankFile        []BankStatementUploadFile
 		startDate       time.Time
@@ -52,8 +52,8 @@ type (
 func NewUploadFile(
 	transactionFile []TransactionUploadFile,
 	bankFile []BankStatementUploadFile,
-	startDate, endDate time.Time) *uploadFile {
-	return &uploadFile{
+	startDate, endDate time.Time) *UploadFile {
+	return &UploadFile{
 		transactionFile: transactionFile,
 		bankFile:        bankFile,
 		startDate:       startDate,
