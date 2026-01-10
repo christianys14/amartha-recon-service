@@ -1,24 +1,27 @@
 package recon
 
 import (
+	"amartha-recon-service/common"
 	"amartha-recon-service/configuration"
 	"amartha-recon-service/infrastructure/repository/transaction"
 	"context"
 	"errors"
+	"sort"
 )
 
 var (
-	ErrorMaxRows error = errors.New("file yang diupload terlalu besar")
+	ErrorMaxRows = errors.New("file yang diupload terlalu besar")
 )
 
 type (
 	service struct {
 		cfg        configuration.Configuration
+		generate   common.Generate
 		repository transaction.Repository
 	}
 
 	Service interface {
-		Proceed(ctx context.Context, file *uploadFile) error
+		Proceed(ctx context.Context, file *uploadFile) (ShowResultReconciliation, error)
 	}
 )
 
@@ -27,23 +30,24 @@ func NewService(
 	repository transaction.Repository) Service {
 	return &service{
 		cfg:        cfg,
+		generate:   common.NewGenerate(),
 		repository: repository,
 	}
 }
 
-func (s service) Proceed(ctx context.Context, file *uploadFile) error {
+func (s *service) Proceed(ctx context.Context, file *uploadFile) (ShowResultReconciliation, error) {
 	lengthTransaction := len(file.transactionFile)
 	maxRowsTransaction := int(s.cfg.GetInt("max.rows.transactions"))
 
 	if lengthTransaction > maxRowsTransaction {
-		return ErrorMaxRows
+		return ShowResultReconciliation{}, ErrorMaxRows
 	}
 
 	lengthBank := len(file.bankFile)
 	maxRowsBank := int(s.cfg.GetInt("max.rows.bank"))
 
 	if lengthBank > maxRowsBank {
-		return ErrorMaxRows
+		return ShowResultReconciliation{}, ErrorMaxRows
 	}
 
 	maxLen := lengthTransaction
@@ -51,14 +55,32 @@ func (s service) Proceed(ctx context.Context, file *uploadFile) error {
 		maxLen = lengthBank
 	}
 
+	var (
+		filteredTransactionUploadFile   []TransactionUploadFile
+		filteredBankStatementUploadFile []BankStatementUploadFile
+	)
+
+	// Filter transactions and bank statements by the date range
+	for _, tf := range file.transactionFile {
+		if !tf.TransactionTime.Before(file.startDate) && !tf.TransactionTime.After(file.endDate) {
+			filteredTransactionUploadFile = append(filteredTransactionUploadFile, tf)
+		}
+	}
+
+	for _, bf := range file.bankFile {
+		if !bf.Date.Before(file.startDate) && !bf.Date.After(file.endDate) {
+			filteredBankStatementUploadFile = append(filteredBankStatementUploadFile, bf)
+		}
+	}
+
 	// 1. Group transactions and bank statements by BankCode
 	transactionsByBank := make(map[string][]TransactionUploadFile)
-	for _, tx := range file.transactionFile {
+	for _, tx := range filteredTransactionUploadFile {
 		transactionsByBank[tx.BankCode] = append(transactionsByBank[tx.BankCode], tx)
 	}
 
 	bankByBank := make(map[string][]BankStatementUploadFile)
-	for _, b := range file.bankFile {
+	for _, b := range filteredBankStatementUploadFile {
 		bankByBank[b.BankCode] = append(bankByBank[b.BankCode], b)
 	}
 
@@ -120,9 +142,9 @@ func (s service) Proceed(ctx context.Context, file *uploadFile) error {
 			}
 
 			totalWorkers++
-			go func(tc []TransactionUploadFile, bc []BankStatementUploadFile) {
-				resultsChan <- s.reconcile(tc, bc)
-			}(txChunk, bankChunk)
+			go func(tx []TransactionUploadFile, bx []BankStatementUploadFile, bc string) {
+				resultsChan <- s.reconcile(tx, bx, bc)
+			}(txChunk, bankChunk, bankCode)
 		}
 	}
 
@@ -132,10 +154,17 @@ func (s service) Proceed(ctx context.Context, file *uploadFile) error {
 		finalResults = append(finalResults, res)
 	}
 
-	return nil
+	sort.Slice(finalResults, func(i, j int) bool {
+		return finalResults[i].BankCode < finalResults[j].BankCode
+	})
+
+	return s.showResultReconciliation(finalResults), nil
 }
 
-func (s service) reconcile(txs []TransactionUploadFile, banks []BankStatementUploadFile) ResultReconciliation {
+func (s *service) reconcile(
+	txs []TransactionUploadFile,
+	banks []BankStatementUploadFile,
+	bc string) ResultReconciliation {
 	result := ResultReconciliation{
 		ResultReconciliationDetails: ResultReconciliationDetails{
 			TransactionMismatched:   []TransactionUploadFile{},
@@ -186,5 +215,46 @@ func (s service) reconcile(txs []TransactionUploadFile, banks []BankStatementUpl
 	}
 
 	result.TotalNumberOfTransactions = len(txs)
+	result.BankCode = bc
 	return result
+}
+
+func (s *service) showResultReconciliation(finalResult []ResultReconciliation) ShowResultReconciliation {
+	mergedMap := make(map[string]*ResultReconciliation)
+
+	for _, fr := range finalResult {
+		if existing, ok := mergedMap[fr.BankCode]; ok {
+			existing.TotalNumberOfTransactions += fr.TotalNumberOfTransactions
+			existing.TotalNumberOfMatchesTransactions += fr.TotalNumberOfMatchesTransactions
+			existing.TotalNumberOfUnmatchedTransactions += fr.TotalNumberOfUnmatchedTransactions
+			existing.TotalAmountDiscrepancies = existing.TotalAmountDiscrepancies.Add(fr.TotalAmountDiscrepancies)
+
+			existing.ResultReconciliationDetails.TransactionMismatched = append(
+				existing.ResultReconciliationDetails.TransactionMismatched,
+				fr.ResultReconciliationDetails.TransactionMismatched...,
+			)
+
+			existing.ResultReconciliationDetails.BankStatementMismatched = append(
+				existing.ResultReconciliationDetails.BankStatementMismatched,
+				fr.ResultReconciliationDetails.BankStatementMismatched...,
+			)
+		} else {
+			// Create a copy to avoid mutating original slice elements if needed
+			item := fr
+			mergedMap[fr.BankCode] = &item
+		}
+	}
+
+	var result []ResultReconciliation
+	for _, v := range mergedMap {
+		result = append(result, *v)
+	}
+
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].BankCode < result[j].BankCode
+	})
+
+	return ShowResultReconciliation{
+		ResultReconciliation: result,
+	}
 }

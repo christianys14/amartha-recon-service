@@ -103,7 +103,8 @@ func (c *controller) Proceed(w http.ResponseWriter, r *http.Request) {
 	}
 
 	uploadFile := recon.NewUploadFile(transactionUploadFiles, bankStatementUploadFiles, startDateParse, endDateParse)
-	if err := c.service.Proceed(r.Context(), uploadFile); err != nil {
+	response, err := c.service.Proceed(r.Context(), uploadFile)
+	if err != nil {
 		common.ToErrorResponse(w,
 			constant2.HttpRc[constant2.GeneralError],
 			constant2.HttpRcDescription[constant2.GeneralError],
@@ -111,6 +112,8 @@ func (c *controller) Proceed(w http.ResponseWriter, r *http.Request) {
 		log.Printf("error invoke service: %v", err)
 		return
 	}
+
+	common.ToSuccessResponse(w, nil, response)
 }
 
 func parseTransactionsFromCSV(reader *csv.Reader) ([]recon.TransactionUploadFile, error) {
@@ -165,7 +168,7 @@ func parseTransactionRow(row []string) recon.TransactionUploadFile {
 	}
 
 	if len(row) > 5 {
-		if dt, err := time.Parse(time.DateOnly, row[5]); err == nil {
+		if dt, err := time.Parse(time.DateTime, row[5]); err == nil {
 			tfs.TransactionTime = dt
 		}
 	}
@@ -213,7 +216,7 @@ func parseBankRow(row []string) recon.BankStatementUploadFile {
 	}
 
 	if len(row) > 2 {
-		if dt, err := time.Parse(time.DateOnly, row[2]); err == nil {
+		if dt, err := time.Parse(time.DateTime, row[2]); err == nil {
 			bsu.Date = dt
 		}
 	}

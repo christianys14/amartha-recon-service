@@ -36,11 +36,16 @@ type (
 		TotalNumberOfUnmatchedTransactions int                         `json:"total_number_of_unmatched_transactions"`
 		ResultReconciliationDetails        ResultReconciliationDetails `json:"result_reconciliation_details"`
 		TotalAmountDiscrepancies           decimal.Decimal             `json:"total_amount_discrepancies"`
+		BankCode                           string                      `json:"bank_code"`
 	}
 
 	ResultReconciliationDetails struct {
 		TransactionMismatched   []TransactionUploadFile   `json:"transaction_mismatched"`
 		BankStatementMismatched []BankStatementUploadFile `json:"bank_statement_mismatched"`
+	}
+
+	ShowResultReconciliation struct {
+		ResultReconciliation []ResultReconciliation `json:"result_reconciliation"`
 	}
 )
 
