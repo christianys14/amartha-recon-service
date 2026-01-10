@@ -29,6 +29,19 @@ type (
 		Date     time.Time       `json:"date"`
 		BankCode string          `json:"bank_code"`
 	}
+
+	ResultReconciliation struct {
+		TotalNumberOfTransactions          int                         `json:"total_number_of_transactions"`
+		TotalNumberOfMatchesTransactions   int                         `json:"total_number_of_matches_transactions"`
+		TotalNumberOfUnmatchedTransactions int                         `json:"total_number_of_unmatched_transactions"`
+		ResultReconciliationDetails        ResultReconciliationDetails `json:"result_reconciliation_details"`
+		TotalAmountDiscrepancies           decimal.Decimal             `json:"total_amount_discrepancies"`
+	}
+
+	ResultReconciliationDetails struct {
+		TransactionMismatched   []TransactionUploadFile   `json:"transaction_mismatched"`
+		BankStatementMismatched []BankStatementUploadFile `json:"bank_statement_mismatched"`
+	}
 )
 
 func NewUploadFile(

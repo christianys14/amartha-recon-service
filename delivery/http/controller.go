@@ -32,6 +32,7 @@ func (c *controller) Proceed(w http.ResponseWriter, r *http.Request) {
 	startDate := r.FormValue("start_date")
 	startDateParse, err := time.Parse(time.DateOnly, startDate)
 	if err != nil {
+		log.Printf("error parsing startDate: %v", err)
 		common.ToErrorResponse(w,
 			constant2.HttpRc[constant2.ValusIsMismatach],
 			constant2.HttpRcDescription[constant2.ValusIsMismatach],
@@ -42,6 +43,7 @@ func (c *controller) Proceed(w http.ResponseWriter, r *http.Request) {
 	endDate := r.FormValue("end_date")
 	endDateParse, err := time.Parse(time.DateOnly, endDate)
 	if err != nil {
+		log.Printf("error parsing endDate: %v", err)
 		common.ToErrorResponse(w,
 			constant2.HttpRc[constant2.ValusIsMismatach],
 			constant2.HttpRcDescription[constant2.ValusIsMismatach],

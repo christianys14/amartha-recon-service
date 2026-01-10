@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/spf13/cobra"
@@ -42,8 +43,10 @@ var serveHttp = &cobra.Command{
 
 		reconHandler := http.NewReconHandler(cfg, transactionController).BuildHttp(router)
 		reconHttpServer := http2.Server{
-			Addr:    reconHttpServerAddress,
-			Handler: reconHandler,
+			Addr:         reconHttpServerAddress,
+			Handler:      reconHandler,
+			WriteTimeout: 15 * time.Second,
+			ReadTimeout:  15 * time.Second,
 		}
 
 		go func() {
