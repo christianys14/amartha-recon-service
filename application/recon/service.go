@@ -51,33 +51,15 @@ func (s *service) Proceed(ctx context.Context, file *UploadFile) (ShowResultReco
 	if lengthBank > maxLen {
 		maxLen = lengthBank
 	}
-
-	var (
-		filteredTransactionUploadFile   []TransactionUploadFile
-		filteredBankStatementUploadFile []BankStatementUploadFile
-	)
-
-	// Filter transactions and bank statements by the date range
-	for _, tf := range file.transactionFile {
-		if !tf.TransactionTime.Before(file.startDate) && !tf.TransactionTime.After(file.endDate) {
-			filteredTransactionUploadFile = append(filteredTransactionUploadFile, tf)
-		}
-	}
-
-	for _, bf := range file.bankFile {
-		if !bf.Date.Before(file.startDate) && !bf.Date.After(file.endDate) {
-			filteredBankStatementUploadFile = append(filteredBankStatementUploadFile, bf)
-		}
-	}
-
+	
 	// 1. Group transactions and bank statements by BankCode
 	transactionsByBank := make(map[string][]TransactionUploadFile)
-	for _, tx := range filteredTransactionUploadFile {
+	for _, tx := range file.transactionFile {
 		transactionsByBank[tx.BankCode] = append(transactionsByBank[tx.BankCode], tx)
 	}
 
 	bankByBank := make(map[string][]BankStatementUploadFile)
-	for _, b := range filteredBankStatementUploadFile {
+	for _, b := range file.bankFile {
 		bankByBank[b.BankCode] = append(bankByBank[b.BankCode], b)
 	}
 

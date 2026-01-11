@@ -5,14 +5,14 @@
 2. MySQL
 
 # My Assumption
-1. Amartha connected with one Aggregator. But, the aggregator could be connected with multiple bank.
-2. The process reporting each bank, submit the transaction to the aggregator. Then aggregator will aggregate and report to Amartha.
-3. When Amartha receive the report from aggregator, amartha system able to recon the transaction from a different bank. It means, only **single format** with contains multiple bank transaction.
-4. Assume each file csv being uploaded, only allowed **max 100k rows**. But the value of 100k is configurable. Why we needed set max rows? In order to prevent from out of memory, or worse make it our system down.
-5. From the requirement, that I know trxID != transaction_id, but the dummy data i was created trxID == transaction_id. Why? Because from my POV, it's pretty weird if we check only using amount only, and im confident enought thats not even the real case.
-6. Since its only for test purpose, i didn't put any Authentications or Authorizations on the API. But, the real case we should applied, no matter what.
-7. The csv system (amartha) the data is coming from big data which generated using BigQuery. But, example data attached here is dummy.
-8. The dummy date generated range is 2026-01-01 to 2026-01-09.
+1. Amartha connected with many banks.
+2. Each reports from any bank has different format template.
+3. Assume each file csv being uploaded, only allowed **max 100k rows**. But the value of 100k is configurable. Why we needed set max rows? In order to prevent it from out of memory, or worse, make our system down.
+4. From the requirement, that I know trxID != transaction_id, but the dummy data i was created trxID == transaction_id. Why? Because from my POV, it's pretty weird if we check only using amount only.
+5. Since its only for test purpose, i didn't put any Authentications or Authorizations on the API. But, the real case we should applied, no matter what.
+6. The csv system (amartha) and bank the data is coming from big data which generated using BigQuery.
+7. The dummy date generated range is 2026-01-01 to 2026-01-09.
+8. It would be better, if we can added more param such as bank_code during the upload. Why? Because it will easier to aggregate the data based on bank.
 
 # Structure Table Transaction
 ## Requirement
@@ -44,7 +44,7 @@
 | 2 | 67890 | RRN0019284 | 50.00 | CREDIT | 008       | 2023-10-02 14:30:00 |
 
 ## Explanations
-1. Why we needed terminal_rrn? Because transaction_id is not equivalent with `unique_identifier` with bank. So, we need to add terminal_rrn to make it looks like "connected" between amartha system and bank. As far as i know, in order to recon, its should not only using field amount. I think we should use other fields such as Terminal RRN, Amount, Transaction Time. So we can guarantee that the transaction is valid and "same"
+1. Why we needed terminal_rrn? Because transaction_id is **not necessarily equivalent** with `unique_identifier` with bank. So, we need to add terminal_rrn to make it looks like "connected" between amartha system and bank. As far as i know, in order to recon, its should not only using field amount. I think we should use other fields such as Terminal RRN, Amount, Transaction Time. So we can guarantee that the transaction is valid and "same"
 2. Why we needed bank_code? Because on table transaction, we can't identify this transaction should be posting into which bank? Further more how we should aggregate based on bank, if we don't have such information?
 3. Why i've script sql on /db/migrations? Because in this test case, the example data is not yet available. So, i had to improve such create table, store procedure in order to generate dummy data.
 

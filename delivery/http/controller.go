@@ -4,6 +4,7 @@ import (
 	"amartha-recon-service/application/recon"
 	"amartha-recon-service/common"
 	constant2 "amartha-recon-service/constant"
+	"context"
 	"encoding/csv"
 	"errors"
 	"io"
@@ -80,8 +81,9 @@ func (c *controller) Proceed(w http.ResponseWriter, r *http.Request) {
 	}
 	defer fileBank.Close()
 
+	ctx := r.Context()
 	readerFileSystem := csv.NewReader(fileSystem)
-	transactionUploadFiles, err := parseTransactionsFromCSV(readerFileSystem)
+	transactionUploadFiles, err := parseTransactionsFromCSV(ctx, readerFileSystem, startDateParse, endDateParse)
 	if err != nil {
 		common.ToErrorResponse(w,
 			constant2.HttpRc[constant2.Validation],
@@ -92,7 +94,7 @@ func (c *controller) Proceed(w http.ResponseWriter, r *http.Request) {
 	}
 
 	readerBank := csv.NewReader(fileBank)
-	bankStatementUploadFiles, err := parseBankFromCSV(readerBank)
+	bankStatementUploadFiles, err := parseBankFromCSV(ctx, readerBank, startDateParse, endDateParse)
 	if err != nil {
 		common.ToErrorResponse(w,
 			constant2.HttpRc[constant2.Validation],
@@ -103,7 +105,7 @@ func (c *controller) Proceed(w http.ResponseWriter, r *http.Request) {
 	}
 
 	uploadFile := recon.NewUploadFile(transactionUploadFiles, bankStatementUploadFiles, startDateParse, endDateParse)
-	response, err := c.service.Proceed(r.Context(), uploadFile)
+	response, err := c.service.Proceed(ctx, uploadFile)
 	if err != nil {
 		common.ToErrorResponse(w,
 			constant2.HttpRc[constant2.GeneralError],
@@ -116,7 +118,10 @@ func (c *controller) Proceed(w http.ResponseWriter, r *http.Request) {
 	common.ToSuccessResponse(w, nil, response)
 }
 
-func parseTransactionsFromCSV(reader *csv.Reader) ([]recon.TransactionUploadFile, error) {
+func parseTransactionsFromCSV(
+	ctx context.Context,
+	reader *csv.Reader,
+	startDate, endDate time.Time) ([]recon.TransactionUploadFile, error) {
 	// Skip header
 	if _, err := reader.Read(); err != nil {
 		if err == io.EOF {
@@ -127,6 +132,12 @@ func parseTransactionsFromCSV(reader *csv.Reader) ([]recon.TransactionUploadFile
 
 	var transactions []recon.TransactionUploadFile
 	for {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+		}
+
 		row, err := reader.Read()
 		if err == io.EOF {
 			break
@@ -136,7 +147,10 @@ func parseTransactionsFromCSV(reader *csv.Reader) ([]recon.TransactionUploadFile
 			return nil, err
 		}
 
-		transactions = append(transactions, parseTransactionRow(row))
+		parseRow := parseTransactionRow(row)
+		if !parseRow.TransactionTime.Before(startDate) && !parseRow.TransactionTime.After(endDate) {
+			transactions = append(transactions, parseRow)
+		}
 	}
 
 	return transactions, nil
@@ -176,7 +190,10 @@ func parseTransactionRow(row []string) recon.TransactionUploadFile {
 	return tfs
 }
 
-func parseBankFromCSV(reader *csv.Reader) ([]recon.BankStatementUploadFile, error) {
+func parseBankFromCSV(
+	ctx context.Context,
+	reader *csv.Reader,
+	startDate, endDate time.Time) ([]recon.BankStatementUploadFile, error) {
 	// Skip header
 	if _, err := reader.Read(); err != nil {
 		if err == io.EOF {
@@ -187,6 +204,12 @@ func parseBankFromCSV(reader *csv.Reader) ([]recon.BankStatementUploadFile, erro
 
 	var bankStatementUploadFiles []recon.BankStatementUploadFile
 	for {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+		}
+
 		row, err := reader.Read()
 		if err == io.EOF {
 			break
@@ -196,7 +219,10 @@ func parseBankFromCSV(reader *csv.Reader) ([]recon.BankStatementUploadFile, erro
 			return nil, err
 		}
 
-		bankStatementUploadFiles = append(bankStatementUploadFiles, parseBankRow(row))
+		parseRow := parseBankRow(row)
+		if !parseRow.Date.Before(startDate) && !parseRow.Date.After(endDate) {
+			bankStatementUploadFiles = append(bankStatementUploadFiles, parseRow)
+		}
 	}
 
 	return bankStatementUploadFiles, nil
