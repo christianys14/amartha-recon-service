@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"sort"
+	"sync"
 )
 
 var (
@@ -51,7 +52,7 @@ func (s *service) Proceed(ctx context.Context, file *UploadFile) (ShowResultReco
 	if lengthBank > maxLen {
 		maxLen = lengthBank
 	}
-	
+
 	// 1. Group transactions and bank statements by BankCode
 	transactionsByBank := make(map[string][]TransactionUploadFile)
 	for _, tx := range file.transactionFile {
@@ -74,9 +75,9 @@ func (s *service) Proceed(ctx context.Context, file *UploadFile) (ShowResultReco
 	}
 
 	// 3. Create a channel to collect results and use a WaitGroup to manage goroutines
+	var wg sync.WaitGroup
 	maxChunk := int(s.cfg.GetInt("max.chunk"))
 	resultsChan := make(chan ResultReconciliation)
-	totalWorkers := 0
 
 	for bankCode := range uniqueBanks {
 		txs := transactionsByBank[bankCode]
@@ -120,16 +121,21 @@ func (s *service) Proceed(ctx context.Context, file *UploadFile) (ShowResultReco
 				bankChunk = banks[i:bankEnd]
 			}
 
-			totalWorkers++
+			wg.Add(1)
 			go func(tx []TransactionUploadFile, bx []BankStatementUploadFile, bc string) {
+				defer wg.Done()
 				resultsChan <- s.reconcile(tx, bx, bc)
 			}(txChunk, bankChunk, bankCode)
 		}
 	}
 
+	go func() {
+		wg.Wait()
+		close(resultsChan)
+	}()
+
 	var finalResults []ResultReconciliation
-	for i := 0; i < totalWorkers; i++ {
-		res := <-resultsChan
+	for res := range resultsChan {
 		finalResults = append(finalResults, res)
 	}
 
